@@ -1,0 +1,32 @@
+# Environment & Local Configuration
+.env
+*.env
+!.env.example
+
+# Python / Virtual Environment
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+backend/.venv/
+backend/__pycache__/
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.oxlintrc.json
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Large / Temporary Archives
+*.zip
+backend/uploads/*
+!backend/uploads/.gitkeep

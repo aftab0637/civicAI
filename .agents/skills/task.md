@@ -1,0 +1,23 @@
+# Tasks
+
+- [x] Backend setup
+  - [x] Initialize Python Virtual Environment & install requirements
+  - [x] Configure `.env` & `.env.example`
+  - [x] Database connection code & model definition
+  - [x] Database initialization script `setup_db.py`
+  - [x] Pydantic Schemas for validation
+  - [x] Cryptography and JWT utilities in auth services
+  - [x] Auth, Users, Complaints endpoint routes
+  - [x] Main FastAPI application startup & static assets mount
+- [x] Frontend setup
+  - [x] Initialize Vite React application
+  - [x] Configure Tailwind CSS
+  - [x] Add basic routes, navigation, and state context
+  - [x] Implement Signup page
+  - [x] Implement Login page
+  - [x] Implement Dashboard UI
+  - [x] Implement Report Issue Page with Image Upload
+  - [x] Implement My Complaints List view
+- [x] Verification
+  - [x] Run database setup and verify connection (Completed)
+  - [x] Verify complete user flow (Signup -> Login -> Report Issue -> My Complaints)
