@@ -317,6 +317,9 @@ export default function Analytics() {
                           <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold uppercase">{c.status}</span>
                         </div>
                         <p className="text-slate-600 font-medium leading-relaxed">{c.description.substring(0, 75)}...</p>
+                        {c.address && (
+                          <p className="text-[10px] text-indigo-700 font-semibold truncate">📍 {c.address}</p>
+                        )}
                         <div className="text-[10px] text-slate-400 font-semibold pt-1 border-t border-slate-100 flex items-center justify-between">
                           <span>Class: {c.category || "General"}</span>
                           <Link to={`/complaints/${c.id}`} className="text-indigo-600 hover:underline font-bold">Open Details</Link>

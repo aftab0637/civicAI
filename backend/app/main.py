@@ -5,11 +5,40 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routes import auth, users, complaints, predictions
 
+from app.database.connection import engine, Base
+from sqlalchemy import inspect, text
+
 app = FastAPI(
     title="CivicAI API",
     description="Backend API for CivicAI - Smart Citizen Analytics & Disaster Response Platform",
     version="1.0.0"
 )
+
+# Ensure tables exist and run auto-migration for missing columns
+@app.on_event("startup")
+def startup_event():
+    Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        if "complaints" in inspector.get_table_names():
+            columns = [col["name"] for col in inspector.get_columns("complaints")]
+            alter_queries = []
+            if "address" not in columns:
+                alter_queries.append("ALTER TABLE complaints ADD COLUMN address TEXT")
+            if "rating" not in columns:
+                alter_queries.append("ALTER TABLE complaints ADD COLUMN rating INTEGER")
+            if "feedback" not in columns:
+                alter_queries.append("ALTER TABLE complaints ADD COLUMN feedback TEXT")
+            if "updated_at" not in columns:
+                alter_queries.append("ALTER TABLE complaints ADD COLUMN updated_at DATETIME")
+            
+            for q in alter_queries:
+                try:
+                    conn.execute(text(q))
+                    conn.commit()
+                except Exception as e:
+                    print(f"Auto-migration query failed (may already exist): {e}")
+
 
 # CORS middleware configuration
 # Allow React frontend (default http://localhost:5173 or other local hosts) to make API requests

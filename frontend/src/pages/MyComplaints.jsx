@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, MapPin, AlertCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, AlertCircle, RefreshCw, Star, Navigation } from "lucide-react";
 import axios from "axios";
 
 export default function MyComplaints() {
@@ -174,12 +174,22 @@ export default function MyComplaints() {
                       )}
 
                       {/* Description */}
-                      <p className="text-slate-800 text-sm leading-relaxed mb-4">
+                      <p className="text-slate-800 text-sm leading-relaxed mb-3">
                         {complaint.description}
                       </p>
 
-                      {/* Admin Remarks Section */}
-                      {(complaint.assigned_to || complaint.admin_notes) && (
+                      {/* Manual Address Row */}
+                      {complaint.address && (
+                        <div className="flex items-start space-x-1.5 text-xs text-slate-700 mb-3 bg-slate-50 p-2 rounded border border-slate-200">
+                          <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                          <span className="font-medium text-slate-800">
+                            <strong>Address:</strong> {complaint.address}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Admin Remarks & Rating */}
+                      {(complaint.assigned_to || complaint.admin_notes || complaint.rating) && (
                         <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 shadow-inner">
                           {complaint.assigned_to && (
                             <div className="text-slate-700 flex items-center space-x-1">
@@ -194,6 +204,17 @@ export default function MyComplaints() {
                               <span className="font-semibold text-slate-550">Resolution Update:</span> {complaint.admin_notes}
                             </p>
                           )}
+                          {complaint.rating && (
+                            <div className="flex items-center space-x-1 text-amber-500 pt-1 border-t border-slate-200">
+                              <span className="font-bold text-slate-600 mr-1">Your Rating:</span>
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star
+                                  key={s}
+                                  className={`h-3.5 w-3.5 ${s <= complaint.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"}`}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -202,16 +223,25 @@ export default function MyComplaints() {
                     <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4 text-xs text-slate-400 font-medium">
                       <span>Submitted: {formatDate(complaint.created_at)}</span>
                       
-                      {complaint.latitude && complaint.longitude ? (
-                        <div className="flex items-center space-x-1 text-slate-600">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                          <span>
-                            {complaint.latitude}, {complaint.longitude}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-350 italic">No GPS coordinates</span>
-                      )}
+                      <div className="flex items-center space-x-3">
+                        {complaint.latitude && complaint.longitude ? (
+                          <div className="flex items-center space-x-1 text-slate-600">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span>
+                              {complaint.latitude}, {complaint.longitude}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-350 italic">No GPS coordinates</span>
+                        )}
+
+                        <Link
+                          to={`/complaints/${complaint.id}`}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs font-bold transition"
+                        >
+                          Details & Rating →
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>

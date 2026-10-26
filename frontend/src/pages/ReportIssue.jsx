@@ -1,14 +1,52 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Upload, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Upload, MapPin, CheckCircle2, AlertTriangle, Search, Compass } from "lucide-react";
 import axios from "axios";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Custom pin icon for location picker
+const locationPickerIcon = L.divIcon({
+  className: "custom-picker-pin",
+  html: `<div style="
+    background-color: #4f46e5;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 3px solid #ffffff;
+    box-shadow: 0 0 12px rgba(79, 70, 229, 0.8), 0 0 4px rgba(0,0,0,0.4);
+  "></div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
+
+// Map click listener component
+function LocationMarker({ position, setPosition, setLatitude, setLongitude, reverseGeocode }) {
+  useMapEvents({
+    click(e) {
+      const lat = parseFloat(e.latlng.lat.toFixed(6));
+      const lng = parseFloat(e.latlng.lng.toFixed(6));
+      setPosition([lat, lng]);
+      setLatitude(lat);
+      setLongitude(lng);
+      reverseGeocode(lat, lng);
+    },
+  });
+
+  return position ? <Marker position={position} icon={locationPickerIcon} /> : null;
+}
 
 export default function ReportIssue() {
   const [description, setDescription] = useState("");
+  const [address, setAddress] = useState("");
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  
+  const [mapPosition, setMapPosition] = useState([12.971598, 77.594562]); // Default center
+  const [isGeocoding, setIsGeocoding] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -19,7 +57,7 @@ export default function ReportIssue() {
     const file = e.target.files[0];
     if (file) {
       if (!file.type.startsWith("image/")) {
-        setError("Please upload an image file.");
+        setError("Please upload a valid image file.");
         return;
       }
       setImage(file);
@@ -33,6 +71,55 @@ export default function ReportIssue() {
     }
   };
 
+  // Reverse Geocoding: GPS lat/lng -> Street Address
+  const reverseGeocode = async (lat, lng) => {
+    setIsGeocoding(true);
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      if (response.data && response.data.display_name) {
+        setAddress(response.data.display_name);
+      }
+    } catch (err) {
+      console.log("Reverse geocode silent fallback:", err);
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  // Forward Geocoding: Street Address -> GPS lat/lng
+  const handleAddressLookup = async () => {
+    if (!address.trim()) {
+      setError("Please enter a street address or landmark to search.");
+      return;
+    }
+    setIsGeocoding(true);
+    setError("");
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+      );
+      if (response.data && response.data.length > 0) {
+        const topResult = response.data[0];
+        const lat = parseFloat(parseFloat(topResult.lat).toFixed(6));
+        const lng = parseFloat(parseFloat(topResult.lon).toFixed(6));
+        setLatitude(lat);
+        setLongitude(lng);
+        setMapPosition([lat, lng]);
+        setAddress(topResult.display_name);
+      } else {
+        setError("Address not found on map. You can still submit manual text or click on the map.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to geocode address. Please select on the map or enter GPS manually.");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  // Browser GPS Autofill
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
@@ -41,13 +128,17 @@ export default function ReportIssue() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLatitude(position.coords.latitude.toFixed(6));
-        setLongitude(position.coords.longitude.toFixed(6));
+        const lat = parseFloat(position.coords.latitude.toFixed(6));
+        const lng = parseFloat(position.coords.longitude.toFixed(6));
+        setLatitude(lat);
+        setLongitude(lng);
+        setMapPosition([lat, lng]);
         setError("");
+        reverseGeocode(lat, lng);
       },
       (err) => {
         console.error("Location retrieval failed", err);
-        setError("Failed to fetch location. Please enter manually if needed.");
+        setError("Failed to fetch browser location. Please enter address manually or click on map.");
       }
     );
   };
@@ -72,6 +163,9 @@ export default function ReportIssue() {
 
     const formData = new FormData();
     formData.append("description", description);
+    if (address) {
+      formData.append("address", address);
+    }
     if (image) {
       formData.append("image", image);
     }
@@ -92,6 +186,7 @@ export default function ReportIssue() {
 
       setSuccess("Complaint submitted and analyzed by CivicAI successfully!");
       setDescription("");
+      setAddress("");
       setImage(null);
       setImagePreview("");
       setLatitude("");
@@ -130,7 +225,7 @@ export default function ReportIssue() {
         <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-sm">
           <h2 className="text-xl font-extrabold mb-1.5 text-slate-900 tracking-tight">Report Civic Issue</h2>
           <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-            Upload a photo and describe the problem. CivicAI will automatically classify the category and prioritize it for local departments.
+            Provide manual address or GPS coordinates, upload photo evidence, and describe the problem. CivicAI auto-classifies category & priority.
           </p>
 
           {/* Alert Banners */}
@@ -165,6 +260,35 @@ export default function ReportIssue() {
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm resize-none"
                 required
               ></textarea>
+            </div>
+
+            {/* MANUAL ADDRESS INPUT FIELD (User explicit requirement) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-slate-550 uppercase tracking-wider">
+                  Manual Location Address / Landmark
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddressLookup}
+                  disabled={isGeocoding}
+                  className="flex items-center space-x-1 text-xs font-bold text-indigo-600 hover:text-indigo-700 transition cursor-pointer disabled:opacity-50"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span>{isGeocoding ? "Searching..." : "Find on Map"}</span>
+                </button>
+              </div>
+
+              <textarea
+                rows="2"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter street address, building/block name, ward number, city or landmark..."
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm resize-none"
+              ></textarea>
+              <p className="text-[10px] text-slate-400 mt-1">
+                You can manually type your full address above or click on the interactive map below.
+              </p>
             </div>
 
             {/* Photo upload */}
@@ -210,21 +334,45 @@ export default function ReportIssue() {
               </div>
             </div>
 
-            {/* Location coordinates */}
+            {/* Interactive Location Picker Map & GPS Coordinates */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-semibold text-slate-555 uppercase tracking-wider">
-                  Location GPS Coordinates (Optional)
+                  Interactive Map & GPS Pin
                 </label>
                 <button
                   type="button"
                   onClick={handleGetLocation}
                   className="flex items-center space-x-1 text-xs font-semibold text-indigo-650 hover:text-indigo-700 transition cursor-pointer"
                 >
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span>Autofill GPS</span>
+                  <Compass className="h-3.5 w-3.5" />
+                  <span>Autofill GPS from Device</span>
                 </button>
               </div>
+
+              {/* Leaflet interactive map picker */}
+              <div className="h-48 w-full rounded-lg overflow-hidden border border-slate-200 mb-3 relative z-10">
+                <MapContainer
+                  center={mapPosition}
+                  zoom={13}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <LocationMarker
+                    position={latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : null}
+                    setPosition={(pos) => setMapPosition(pos)}
+                    setLatitude={setLatitude}
+                    setLongitude={setLongitude}
+                    reverseGeocode={reverseGeocode}
+                  />
+                </MapContainer>
+              </div>
+              <p className="text-[10px] text-slate-400 mb-3 italic">
+                Tip: Click anywhere on the map to pin exact location. It will automatically populate GPS coordinates & address.
+              </p>
 
               <div className="grid grid-cols-2 gap-4">
                 <input

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.models.user import User
 from app.models.complaint import Complaint
-from app.schemas.complaint import ComplaintOut, ComplaintUpdate
+from app.schemas.complaint import ComplaintOut, ComplaintUpdate, ComplaintRating
 from app.services.auth import get_current_user
 from app.services.ml import analyze_issue
 
@@ -21,6 +21,7 @@ if not os.path.exists(UPLOAD_DIR):
 @router.post("", response_model=ComplaintOut, status_code=status.HTTP_201_CREATED)
 def create_complaint(
     description: str = Form(...),
+    address: Optional[str] = Form(None),
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
     image: Optional[UploadFile] = File(None),
@@ -60,6 +61,7 @@ def create_complaint(
     new_complaint = Complaint(
         user_id=current_user.id,
         description=description,
+        address=address,
         image_path=image_path,
         latitude=latitude,
         longitude=longitude,
@@ -113,7 +115,6 @@ def get_complaint_by_id(
     return complaint
 
 @router.put("/{id}", response_model=ComplaintOut)
-
 def update_complaint(
     id: int,
     complaint_data: ComplaintUpdate,
@@ -145,3 +146,36 @@ def update_complaint(
     db.commit()
     db.refresh(complaint)
     return complaint
+
+@router.post("/{id}/rate", response_model=ComplaintOut)
+def rate_complaint(
+    id: int,
+    rating_data: ComplaintRating,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    complaint = db.query(Complaint).filter(Complaint.id == id).first()
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Complaint not found"
+        )
+    if complaint.user_id != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: You can only rate your own complaint."
+        )
+    if rating_data.rating < 1 or rating_data.rating > 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rating must be between 1 and 5 stars."
+        )
+
+    complaint.rating = rating_data.rating
+    if rating_data.feedback is not None:
+        complaint.feedback = rating_data.feedback
+        
+    db.commit()
+    db.refresh(complaint)
+    return complaint
+

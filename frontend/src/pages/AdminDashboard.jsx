@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Search, Filter, Shield, AlertCircle, Clock, CheckCircle2, 
-  MapPin, Image, Eye, Edit2, X, RefreshCw, Layers, FileText, Sparkles
+  MapPin, Image, Eye, Edit2, X, RefreshCw, Layers, FileText, Sparkles, Download, Star, Navigation
 } from "lucide-react";
 import axios from "axios";
 
@@ -98,6 +98,56 @@ export default function AdminDashboard() {
     }
   };
 
+  const exportToCSV = () => {
+    if (filteredComplaints.length === 0) {
+      alert("No complaints available to export.");
+      return;
+    }
+    const headers = [
+      "ID",
+      "Date",
+      "Category",
+      "Severity",
+      "Status",
+      "Assigned To",
+      "Manual Address",
+      "Latitude",
+      "Longitude",
+      "Description",
+      "Rating",
+      "Feedback"
+    ];
+
+    const csvRows = [headers.join(",")];
+
+    filteredComplaints.forEach((c) => {
+      const row = [
+        c.id,
+        `"${new Date(c.created_at).toISOString()}"`,
+        `"${(c.category || "").replace(/"/g, '""')}"`,
+        `"${(c.severity || "").replace(/"/g, '""')}"`,
+        `"${(c.status || "").replace(/"/g, '""')}"`,
+        `"${(c.assigned_to || "").replace(/"/g, '""')}"`,
+        `"${(c.address || "").replace(/"/g, '""')}"`,
+        c.latitude || "",
+        c.longitude || "",
+        `"${(c.description || "").replace(/"/g, '""')}"`,
+        c.rating || "",
+        `"${(c.feedback || "").replace(/"/g, '""')}"`
+      ];
+      csvRows.push(row.join(","));
+    });
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `CivicAI_Complaints_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -115,7 +165,9 @@ export default function AdminDashboard() {
   const filteredComplaints = complaints.filter((c) => {
     const matchesSearch = c.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (c.id && c.id.toString().includes(searchQuery)) ||
-                          (c.assigned_to && c.assigned_to.toLowerCase().includes(searchQuery.toLowerCase()));
+                          (c.assigned_to && c.assigned_to.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (c.address && c.address.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (c.feedback && c.feedback.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
     const matchesSeverity = severityFilter === "all" || c.severity === severityFilter;
     const matchesCategory = categoryFilter === "all" || c.category === categoryFilter;
@@ -166,6 +218,13 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center space-x-3">
+            <button
+              onClick={exportToCSV}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Export CSV</span>
+            </button>
             <Link
               to="/admin/analytics"
               className="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg text-indigo-600 text-xs font-semibold shadow-sm transition cursor-pointer"
@@ -250,7 +309,7 @@ export default function AdminDashboard() {
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search complaints by keyword, ID, or department..."
+                placeholder="Search complaints by keyword, address, review comment, ID, or department..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400"
@@ -329,10 +388,11 @@ export default function AdminDashboard() {
                   <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                     <th className="px-6 py-4">ID</th>
                     <th className="px-6 py-4">Issue Category</th>
-                    <th className="px-6 py-4">Description</th>
+                    <th className="px-6 py-4">Description & Location</th>
                     <th className="px-6 py-4 text-center">Photo</th>
                     <th className="px-6 py-4">Severity</th>
                     <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Rating & Review</th>
                     <th className="px-6 py-4">Assigned To</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
@@ -350,11 +410,20 @@ export default function AdminDashboard() {
                         </span>
                       </td>
 
-                      {/* Description */}
+                      {/* Description & Manual Address */}
                       <td className="px-6 py-4 max-w-xs">
                         <div className="truncate text-slate-900 font-semibold" title={c.description}>
                           {c.description}
                         </div>
+
+                        {/* Manual Address */}
+                        {c.address && (
+                          <div className="text-[11px] text-indigo-700 truncate mt-0.5 flex items-center space-x-1" title={c.address}>
+                            <Navigation className="h-3 w-3 shrink-0" />
+                            <span className="font-medium">{c.address}</span>
+                          </div>
+                        )}
+
                         <div className="flex items-center space-x-1.5 mt-1 text-[11px] text-slate-400">
                           <span>Filed: {new Date(c.created_at).toLocaleDateString()}</span>
                           {c.latitude && (
@@ -397,6 +466,27 @@ export default function AdminDashboard() {
                         <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full border ${getStatusColor(c.status)}`}>
                           {c.status || "PENDING"}
                         </span>
+                      </td>
+
+                      {/* Rating & Review Message */}
+                      <td className="px-6 py-4 max-w-[180px]">
+                        {c.rating ? (
+                          <div>
+                            <div className="flex items-center space-x-1 text-amber-500 font-bold">
+                              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                              <span className="text-xs text-slate-800">{c.rating}/5</span>
+                            </div>
+                            {c.feedback ? (
+                              <p className="text-[11px] text-slate-600 mt-0.5 truncate italic font-medium" title={c.feedback}>
+                                "{c.feedback}"
+                              </p>
+                            ) : (
+                              <span className="text-[10px] text-slate-350 italic block">No message</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-350 italic">Unrated</span>
+                        )}
                       </td>
 
                       {/* Assigned To */}
@@ -456,10 +546,15 @@ export default function AdminDashboard() {
 
             {/* Modal Body */}
             <form onSubmit={handleUpdateSubmit} className="p-6 space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
-                <span className="font-semibold text-slate-500 block mb-1">Issue Description:</span>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 space-y-1">
+                <span className="font-semibold text-slate-500 block">Issue Description:</span>
                 <p className="italic">"{selectedComplaint.description}"</p>
-                <div className="flex space-x-4 mt-2 font-medium">
+                {selectedComplaint.address && (
+                  <p className="text-indigo-700 font-semibold pt-1">
+                    <strong>Address:</strong> {selectedComplaint.address}
+                  </p>
+                )}
+                <div className="flex space-x-4 pt-1 font-medium">
                   <span>Category: <strong className="text-slate-800">{selectedComplaint.category}</strong></span>
                   {selectedComplaint.image_path && (
                     <button 
@@ -472,6 +567,39 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
+
+              {/* Citizen Rating & Review Feedback Block */}
+              {(selectedComplaint.rating || selectedComplaint.feedback) && (
+                <div className="bg-amber-50/80 border border-amber-200 rounded-lg p-3 text-xs space-y-1.5 shadow-sm">
+                  <span className="font-bold text-amber-900 uppercase tracking-wider block text-[10px]">
+                    Citizen Satisfaction & Review Message:
+                  </span>
+                  {selectedComplaint.rating && (
+                    <div className="flex items-center space-x-1.5 text-amber-700 font-bold">
+                      <div className="flex text-amber-400">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-4 w-4 ${
+                              star <= selectedComplaint.rating
+                                ? "text-amber-400 fill-amber-400"
+                                : "text-slate-200"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-slate-900 font-extrabold">{selectedComplaint.rating} / 5 Stars</span>
+                    </div>
+                  )}
+                  {selectedComplaint.feedback ? (
+                    <p className="text-slate-800 italic bg-white p-2 rounded border border-amber-200 text-xs leading-relaxed">
+                      "{selectedComplaint.feedback}"
+                    </p>
+                  ) : (
+                    <p className="text-slate-400 italic text-[11px]">No written feedback message provided.</p>
+                  )}
+                </div>
+              )}
 
               {/* Status Select */}
               <div>

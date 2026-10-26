@@ -54,13 +54,14 @@ def setup_database():
         print(f"Using database: {db_url}")
 
     # Create tables by importing Base and engine
-    print("Creating tables in database...")
+    print("Ensuring tables exist in database...")
     from app.database.connection import engine, Base
     from app.models.user import User
     from app.models.complaint import Complaint
     
+    # Do NOT drop_all so that citizen registrations & filed complaints persist!
     Base.metadata.create_all(bind=engine)
-    print("All tables initialized successfully.")
+    print("All tables verified and initialized successfully.")
 
     # Seed demo user accounts
     print("Seeding demo citizen and admin accounts...")
